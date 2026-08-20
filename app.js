@@ -50,6 +50,13 @@
     return required.filter(key => CONSENT[key] === null || CONSENT[key] === "");
   }
 
+  // Recruitment channel. "pilot" is friends, family, and anyone the researcher can identify; those
+  // records are quarantined out of the confirmatory sample by unique_usable() in common.py. Absent
+  // means "prolific", so the confirmatory default is what you get by doing nothing and a pilot has
+  // to be declared on purpose.
+  const SOURCE = params.get("src") === "pilot" ? "pilot" : "prolific";
+  const IS_PILOT = SOURCE === "pilot";
+
   const participantId = params.get("PROLIFIC_PID") || params.get("pid") || `local-${cryptoRandom()}`;
   const prolificStudyId = params.get("STUDY_ID");
   const prolificSessionId = params.get("SESSION_ID");
@@ -188,14 +195,23 @@
       <h1>Choose AI agents for your accounts</h1>
       <p class="lede">Imagine you have investment and payment accounts. You will choose whether to accept AI agents that watch each account and can act on your behalf.</p>
       <p class="compact-copy">All accounts, money, and AI agents are pretend. Takes about 7 minutes. This is not financial advice.</p>
+      ${IS_PILOT ? `<div class="notice" style="border-color: #7c3aed; background: transparent; text-align: left;">
+        <strong style="color: #7c3aed;">Pilot run — not part of the study results.</strong>
+        <p class="compact-copy" style="margin: 6px 0 0;">You were invited directly. Your answers help check
+        the wording and the timing, and are excluded from the analysis.</p>
+      </div>` : ""}
       <h2 style="margin-top: 22px;">Before you begin</h2>
       <ul class="muted compact-copy" style="margin: 0 0 12px; padding-left: 20px; text-align: left;">
         <li><strong>Taking part is your choice.</strong> You can close this page at any time, no questions asked,
         and it will not affect you on the platform you came from.</li>
         <li><strong>What we record:</strong> the choices you make, your answers, and how long each page takes.
         Nothing else.</li>
-        <li><strong>We never ask for</strong> your name, your real financial details, or any account login. Your
-        answers are linked only to your anonymous ID.</li>
+        <li><strong>We never ask for</strong> your name, your real financial details, or any account login.
+        ${IS_PILOT
+          ? `Because the researcher invited you personally, he may be able to work out which answers are
+             yours. Your responses are used to check that the task is clear and to time it — they are
+             <strong>not</strong> part of the study's results.`
+          : `Your answers are linked only to your anonymous ID.`}</li>
         <li><strong>Your payment does not depend on your answers.</strong> There is no bonus and no right answer.</li>
         <li><strong>Changed your mind later?</strong> Send your ID to the contact below within
         ${CONSENT.withdrawalDays} days and we will delete your answers.</li>
@@ -440,6 +456,7 @@
       prolificSessionId,
       sequenceId,
       assignmentVersion: ASSIGNMENT_VERSION,
+      source: SOURCE,
       dataUseOk: state.dataUseOk,
       startedAt: state.startedAt,
       completedAt,
