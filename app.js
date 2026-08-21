@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.2.0";
-  const INSTRUMENT_VERSION = "study-b-2.2.0";
+  const INSTRUMENT_VERSION = "study-b-2.2.1";
   const ASSIGNMENT_VERSION = "williams-counter-perm-v4";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -56,6 +56,22 @@
   // to be declared on purpose.
   const SOURCE = params.get("src") === "pilot" ? "pilot" : "prolific";
   const IS_PILOT = SOURCE === "pilot";
+
+  // WHETHER THE RETURN LINK IS OFFERED IS A DIFFERENT QUESTION FROM WHETHER THE RECORD COUNTS.
+  //
+  // `src=pilot` quarantines a record out of the confirmatory sample. It used to ALSO suppress the
+  // Prolific return button, on the reasoning that a directly-invited tester must never fire a
+  // completion code for a submission that does not exist. That reasoning is right, but the condition
+  // was wrong: it conflated "excluded from the analysis" with "did not come from Prolific".
+  //
+  // The two come apart the moment you want a PAID timing pilot — recruited through Prolific, so it
+  // must be paid, and quarantined, so the confirmatory sample stays clean. Under the old gate those
+  // participants would have finished the task with no way to submit it.
+  //
+  // The honest condition is whether the platform actually sent them, which is exactly whether it
+  // supplied a PROLIFIC_PID. A friend opening the link by hand has none and is still offered
+  // nothing; a Prolific pilot has one and is paid like anyone else.
+  const CAME_FROM_PROLIFIC = Boolean(params.get("PROLIFIC_PID"));
 
   const participantId = params.get("PROLIFIC_PID") || params.get("pid") || `local-${cryptoRandom()}`;
   const prolificStudyId = params.get("STUDY_ID");
@@ -460,8 +476,11 @@
       <p class="compact-copy">All accounts, money, and AI agents are pretend. This is not financial advice.</p>
       ${IS_PILOT ? `<div class="notice" style="border-color: #7c3aed; background: transparent; text-align: left;">
         <strong style="color: #7c3aed;">Pilot run — not part of the study results.</strong>
-        <p class="compact-copy" style="margin: 6px 0 0;">You were invited directly. Your answers help check
-        the wording and the timing, and are excluded from the analysis.</p>
+        <p class="compact-copy" style="margin: 6px 0 0;">${CAME_FROM_PROLIFIC
+          ? `Your answers help check the wording and the timing, and are excluded from the analysis. You are
+             paid in full, exactly as any other participant.`
+          : `You were invited directly. Your answers help check the wording and the timing, and are excluded
+             from the analysis.`}</p>
       </div>` : ""}
       <h2 style="margin-top: 22px;">Before you begin</h2>
       <ul class="muted compact-copy" style="margin: 0 0 12px; padding-left: 20px; text-align: left;">
@@ -470,11 +489,15 @@
         <li><strong>What we record:</strong> the choices you make, your answers, and how long each page takes.
         Nothing else.</li>
         <li><strong>We never ask for</strong> your name, your real financial details, or any account login.
-        ${IS_PILOT
+        ${IS_PILOT && !CAME_FROM_PROLIFIC
           ? `Because the researcher invited you personally, he may be able to work out which answers are
              yours. Your responses are used to check that the task is clear and to time it — they are
              <strong>not</strong> part of the study's results.`
-          : `Your answers are linked only to your anonymous ID.`}</li>
+          : IS_PILOT
+            ? `Your answers are linked only to your anonymous ID. This is a pilot batch, so your responses are
+               used to check that the task is clear and to time it — they are <strong>not</strong> part of the
+               study's results.`
+            : `Your answers are linked only to your anonymous ID.`}</li>
         <li><strong>Your payment does not depend on your answers.</strong> There is no bonus and no right answer.</li>
         <li><strong>At the end you choose</strong> whether your answers may be used in the research. If you say
         no, we send only a note that you took part and declined. Your answers are not uploaded at all.</li>
@@ -1103,13 +1126,16 @@
       ${needsFile
         ? `<p><a class="button primary" download="${esc(r.withdrawalRef)}.json" href="${blobUrl}">Download response record</a></p>`
         : ""}
-      ${COMPLETION_URL && !IS_PILOT
+      ${COMPLETION_URL && CAME_FROM_PROLIFIC
         ? `<p><a class="button primary" href="${esc(COMPLETION_URL)}">Return to Prolific to finish and be paid</a></p>
            <p class="muted compact-copy">That button is the only thing that submits your study. There is no code
            to type.</p>`
         : ""}
-      ${IS_PILOT ? `<p class="muted compact-copy">That is everything — you can close this page. Thank you for
+      ${IS_PILOT && !CAME_FROM_PROLIFIC ? `<p class="muted compact-copy">That is everything — you can close this page. Thank you for
         helping check the wording; if anything read oddly, tell the researcher directly.</p>` : ""}
+      ${IS_PILOT && CAME_FROM_PROLIFIC ? `<p class="muted compact-copy">You were in a pilot batch, so your
+        answers are used to check the wording and the timing rather than counted in the results. You are paid
+        exactly as any other participant — use the button above to submit.</p>` : ""}
     `, "Complete");
     window.__AB_COMPLETE__ = r;
   }
