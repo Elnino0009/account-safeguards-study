@@ -1,9 +1,9 @@
 "use strict";
 
 (() => {
-  const SCHEMA_VERSION = "ab-empirical-2.0.0";
-  const INSTRUMENT_VERSION = "study-b-2.0.0";
-  const ASSIGNMENT_VERSION = "williams-shell-v2";
+  const SCHEMA_VERSION = "ab-empirical-2.1.0";
+  const INSTRUMENT_VERSION = "study-b-2.1.0";
+  const ASSIGNMENT_VERSION = "williams-variant-v3";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
   // the researcher, not issued by Prolific, so these two files are the only source of truth.
@@ -86,6 +86,7 @@
     trials: [],
     attentionPass: false,
     checks: { authority: false, provenance: false, terminality: false },
+    demand: { repeats: null, guess: null },
     dataUseOk: true,
     record: null,
     uploaded: null
@@ -127,15 +128,125 @@
     return rows.concat(rows.map(row => [...row]));
   }
 
+  // Four matched surface stories per domain. The STIPULATED SUBSTANCE is identical across the four
+  // variants of a domain — the same 15% trigger and £12,000 error cost for investing, the same
+  // £1,200 threshold and £120 error cost for payments, the same horizon and the same reversibility.
+  // Only the account frame and the wording change.
+  //
+  // Why four rather than two: with two shells the card body depended only on domain and authority,
+  // so the eight cards were four distinct scenarios shown twice, and the two cards of a provenance
+  // pair were textually identical apart from the authorship banner. A participant could therefore
+  // read the manipulation straight off the screen, and P2 — the contrast that provenance carries —
+  // was the measure most exposed to it. Pilot feedback reported exactly that: "four questions, each
+  // asked twice".
+  const SCENARIOS = {
+    investing: [
+      { title: "Retirement portfolio",
+        context: "Long-term investment · money for retirement, not needed for at least 12 months",
+        veto: { trigger: "Agent watches for a market crisis (a 15% drop, £100k → £85k)",
+                action: "Agent blocks your sell order",
+                control: "You can remove the agent and place a new order at any time",
+                errorStory: "You can't sell when you want → the market keeps falling → £12,000 lost" },
+        initiation: { trigger: "Agent watches for a market crisis (a 15% drop, £100k → £85k)",
+                action: "Agent sells your holdings into cash",
+                control: "You can remove the agent at any time, and any sale is reversed",
+                errorStory: "Agent sells too early → the market recovers → £12,000 of gains missed" } },
+      { title: "Home-deposit portfolio",
+        context: "Long-term investment · saving for a flat deposit, at least 12 months away",
+        veto: { trigger: "Agent looks out for a sharp fall (15% down, £100k → £85k)",
+                action: "Agent refuses your instruction to sell",
+                control: "Remove the agent whenever you like, then sell yourself",
+                errorStory: "Your sale is refused → prices fall further → you are £12,000 worse off" },
+        initiation: { trigger: "Agent looks out for a sharp fall (15% down, £100k → £85k)",
+                action: "Agent moves your holdings into cash for you",
+                control: "Remove the agent whenever you like; the move is undone",
+                errorStory: "Agent moves out too soon → prices bounce back → you miss £12,000" } },
+      { title: "Children's education fund",
+        context: "Long-term investment · university fees, none due for at least 12 months",
+        veto: { trigger: "Agent monitors for a 15% market drop (£100k down to £85k)",
+                action: "Agent cancels your sell order",
+                control: "Switch the agent off at any point and sell as normal",
+                errorStory: "The sale is cancelled → the fall continues → £12,000 gone" },
+        initiation: { trigger: "Agent monitors for a 15% market drop (£100k down to £85k)",
+                action: "Agent switches the fund into cash",
+                control: "Switch the agent off at any point; the switch is reversed",
+                errorStory: "The switch happens too early → markets recover → £12,000 forgone" } },
+      { title: "Inherited share portfolio",
+        context: "Long-term investment · shares left to you, not needed for a year or more",
+        veto: { trigger: "Agent checks for a 15% slide in value (£100k to £85k)",
+                action: "Agent stops your sale going through",
+                control: "Take the agent off at any time and sell it yourself",
+                errorStory: "Your sale is stopped → the slide goes on → £12,000 lost" },
+        initiation: { trigger: "Agent checks for a 15% slide in value (£100k to £85k)",
+                action: "Agent sells the shares and holds cash",
+                control: "Take the agent off at any time; the sale is undone",
+                errorStory: "Agent sells at the bottom → the recovery happens without you → £12,000 missed" } }
+    ],
+    payments: [
+      { title: "Housing-bill account",
+        context: "Current account · monthly rent payment",
+        veto: { trigger: "Agent watches for a low balance (below £1,200)",
+                action: "Agent blocks your rent payment",
+                control: "You can remove the agent and pay manually at any time",
+                errorStory: "The rent isn't paid → late fee and arrears charge = £120" },
+        initiation: { trigger: "Agent watches for the rent due date",
+                action: "Agent pays the rent automatically",
+                control: "You can remove the agent at any time; any payment is reversed",
+                errorStory: "Agent pays the wrong amount → £120 to put right" } },
+      { title: "Energy-bill account",
+        context: "Current account · monthly energy bill",
+        veto: { trigger: "Agent looks out for the balance dropping under £1,200",
+                action: "Agent refuses your energy payment",
+                control: "Remove the agent whenever you like and pay it yourself",
+                errorStory: "The bill goes unpaid → late fee and reconnection charge = £120" },
+        initiation: { trigger: "Agent looks out for the bill's due date",
+                action: "Agent settles the energy bill for you",
+                control: "Remove the agent whenever you like; the payment is undone",
+                errorStory: "Agent pays the wrong bill → £120 to reverse it" } },
+      { title: "Council-tax account",
+        context: "Current account · monthly council tax",
+        veto: { trigger: "Agent monitors the balance for a dip below £1,200",
+                action: "Agent cancels your council tax payment",
+                control: "Switch the agent off at any point and pay as normal",
+                errorStory: "The instalment is missed → penalty and recovery fee = £120" },
+        initiation: { trigger: "Agent monitors the instalment date",
+                action: "Agent pays the council tax on the due date",
+                control: "Switch the agent off at any point; the payment is reversed",
+                errorStory: "Agent pays twice → £120 to claim back" } },
+      { title: "Insurance-premium account",
+        context: "Current account · monthly insurance premium",
+        veto: { trigger: "Agent checks whether the balance falls under £1,200",
+                action: "Agent stops your premium going out",
+                control: "Take the agent off at any time and pay it directly",
+                errorStory: "The premium lapses → reinstatement fee = £120" },
+        initiation: { trigger: "Agent checks the premium collection date",
+                action: "Agent pays the premium when it falls due",
+                control: "Take the agent off at any time; the payment is undone",
+                errorStory: "Agent pays an old policy → £120 to recover" } }
+    ]
+  };
+  const VARIANT_LABELS = ["A", "B", "C", "D"];
+
+  // Latin-square assignment. Within a domain the four cells are ordered veto/participant,
+  // veto/platform, initiation/participant, initiation/platform; the variant is that index plus a
+  // per-participant, per-domain offset, modulo four.
+  //
+  // Two properties follow, and validate_instrument.py checks both rather than trusting this comment:
+  //   * within a participant, the four cards of a domain use four DIFFERENT stories, so no card is
+  //     a near-duplicate of another;
+  //   * across participants each (cell, story) pairing occurs equally often, so story stays
+  //     orthogonal to direction, provenance and domain and cannot bias P1 or P2.
+  // Story must never be fixed per cell: that would confound the story with the condition, which is
+  // worse than the problem being fixed.
+  function cellIndexInDomain(c) {
+    return (c.authority === "veto" ? 0 : 2) + (c.provenance === "participant" ? 0 : 1);
+  }
+
   function scenarioShell(c) {
-    // XOR parity of the three factor bits is confounded only with the three-way
-    // interaction, so within every participant the shell is balanced 4/4 and
-    // orthogonal to each main effect and each two-way contrast (the P1 and P2
-    // carriers). The participant-level hash flips which shell gets which parity.
-    const parity = (c.domain === "investing" ? 1 : 0)
-      ^ (c.authority === "veto" ? 1 : 0)
-      ^ (c.provenance === "participant" ? 1 : 0);
-    return ((hash32(`${participantId}|shell-v2`) + parity) % 2) === 0 ? "A" : "B";
+    const offset = c.domain === "investing"
+      ? hash32(`${participantId}|variant-investing-v3`) % 4
+      : hash32(`${participantId}|variant-payments-v3`) % 4;
+    return VARIANT_LABELS[(cellIndexInDomain(c) + offset) % 4];
   }
 
   function currentCell() {
@@ -175,6 +286,7 @@
       trialDecision: renderTrialDecision,
       attention: renderAttention,
       checks: renderChecks,
+      demand: renderDemand,
       post: renderPost,
       debrief: renderDebrief
     };
@@ -275,24 +387,11 @@
   }
 
   function ruleDetails(c, shell) {
-    if (c.domain === "investing") {
-      return {
-        title: shell === "A" ? "Retirement portfolio" : "Home-deposit portfolio",
-        context: "Long-term investment · planned for at least 12 months",
-        trigger: "Agent watches for market crisis (e.g., 15% drop from £100k to £85k)",
-        action: c.authority === "veto" ? "Agent blocks your sell order" : "Agent sells holdings into cash",
-        control: c.authority === "veto" ? "Can remove agent and place new order anytime" : "Can remove agent anytime (reverses any sale)",
-        errorStory: c.authority === "veto" ? "You can't sell when you want → Market keeps falling → £12,000 lost" : "Agent sells too early → Market recovers → £12,000 missed gain"
-      };
-    }
-    return {
-      title: shell === "A" ? "Housing-bill account" : "Household-bill account",
-      context: "Current account · routine payment",
-      trigger: c.authority === "veto" ? "Agent watches for low balance (under £1,200)" : "Agent watches for bill due date",
-      action: c.authority === "veto" ? "Agent blocks your bill payment" : "Agent pays the bill automatically",
-      control: c.authority === "veto" ? "Can remove agent and pay manually anytime" : "Can remove agent anytime (reverses any payment)",
-      errorStory: c.authority === "veto" ? "Bill doesn't get paid → Late fees + reconnection charge = £120" : "Agent pays wrong bill → £120 to reverse transaction"
-    };
+    const variant = SCENARIOS[c.domain][VARIANT_LABELS.indexOf(shell)];
+    const arm = variant[c.authority];
+    return { title: variant.title, context: variant.context,
+             trigger: arm.trigger, action: arm.action, control: arm.control,
+             errorStory: arm.errorStory };
   }
 
   function progressDots() {
@@ -418,6 +517,49 @@
         provenance: checked("provenance") === "correct",
         terminality: checked("terminality") === "correct"
       };
+      state.page = "demand"; render();
+    });
+  }
+
+  // Demand-awareness probe. Provenance is manipulated within participant on rules whose substance is
+  // deliberately identical, which buys the precision that makes P2 affordable and, unavoidably, makes
+  // the manipulation easier to spot. Asking directly turns an unmeasured threat into a measured one:
+  // the proportion who identify it is reported, and a preregistered sensitivity analysis re-runs the
+  // contrasts without them.
+  //
+  // Both items are closed. A free-text box here would collect whatever a participant chose to type,
+  // which is how identifying information ends up in a dataset that promises it holds none.
+  //
+  // It runs AFTER the comprehension checks so that asking about repeats cannot prompt the answers to
+  // those, and after every adoption choice so it cannot change what it measures.
+  function renderDemand() {
+    show(`
+      ${phaseIndicator(3, 4, "Checks")}
+      <span class="eyebrow">Last two questions</span><h1>About the task</h1>
+      <p class="compact-copy">These help us understand how the task read. There are no wrong answers,
+      and your payment does not depend on them.</p>
+      <fieldset><legend>Did any of the eight situations feel like repeats of each other?</legend>
+        ${radio("repeats", "yes", "Yes, some felt repeated")}
+        ${radio("repeats", "no", "No, they all felt different")}
+        ${radio("repeats", "unsure", "I'm not sure")}
+      </fieldset>
+      <fieldset><legend>What do you think we were comparing across the eight situations?</legend>
+        ${radio("guess", "authorship", "Who set the agent's instructions")}
+        ${radio("guess", "amounts", "How much money was at stake")}
+        ${radio("guess", "speed", "How quickly the agent reacted")}
+        ${radio("guess", "accounts", "Which kind of account it was")}
+        ${radio("guess", "unsure", "I have no idea")}
+      </fieldset>
+      <div id="demand-error" style="display: none; color: #dc2626; margin: 0.5rem 0; padding: 0.5rem; background: #fef2f2; border-radius: 4px; border-left: 3px solid #dc2626;">Please answer both questions before continuing.</div>
+      <button class="primary" id="continue">Continue</button>
+    `, "About the task");
+    bind("continue", "click", () => {
+      const repeats = checked("repeats"), guess = checked("guess");
+      if (!repeats || !guess) {
+        document.getElementById("demand-error").style.display = "block";
+        return;
+      }
+      state.demand = { repeats, guess };
       state.page = "post"; render();
     });
   }
@@ -463,6 +605,7 @@
       durationMs: Date.now() - state.startedMs,
       attentionPass: state.attentionPass,
       checks: state.checks,
+      demand: state.demand,
       trials: state.trials,
       completionCode: completionCode(participantId)
     };
