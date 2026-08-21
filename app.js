@@ -683,7 +683,11 @@
              ${esc(CONSENT.email)} — but you do not have to.</p>
              <p><a class="button primary" download="${esc(r.completionCode)}.json" href="${blobUrl}">Download response record</a></p>`
           : ""}
-      ${COMPLETION_URL ? `<p><a class="button primary" href="${esc(COMPLETION_URL)}">Return to Prolific</a></p>` : ""}
+      ${COMPLETION_URL && !IS_PILOT
+        ? `<p><a class="button primary" href="${esc(COMPLETION_URL)}">Return to Prolific</a></p>`
+        : ""}
+      ${IS_PILOT ? `<p class="muted compact-copy">That is everything — you can close this page. Thank you for
+        helping check the wording; if anything read oddly, tell the researcher directly.</p>` : ""}
     `, "Complete");
     window.__AB_COMPLETE__ = r;
   }
