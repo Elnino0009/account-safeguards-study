@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.1.0";
-  const INSTRUMENT_VERSION = "study-b-2.1.2";
+  const INSTRUMENT_VERSION = "study-b-2.1.3";
   const ASSIGNMENT_VERSION = "williams-variant-v3";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -226,6 +226,15 @@
                 errorStory: "Agent pays an old policy → £120 to recover" } }
     ]
   };
+  // Held identical across direction and across the four stories of a domain, because the direction
+  // contrast is only clean if the stated error rate does not move with it. Without a stated rate a
+  // participant substitutes their own belief, and that belief may well differ between an agent that
+  // refuses them and one that acts for them — which would ride straight onto P1.
+  const DOMAIN_FACTS = {
+    investing: { frequency: "About once a year", errorRate: "About 1 time in 5" },
+    payments:  { frequency: "About once a month", errorRate: "About 1 time in 5" }
+  };
+
   const VARIANT_LABELS = ["A", "B", "C", "D"];
 
   // Latin-square assignment. Within a domain the four cells are ordered veto/participant,
@@ -306,7 +315,7 @@
       ${phaseIndicator(1, 4, "Setup")}
       <span class="eyebrow">AI agents study</span>
       <h1>Choose AI agents for your accounts</h1>
-      <p class="lede">Imagine you have investment and payment accounts. You will choose whether to accept AI agents that watch each account and can act on your behalf.</p>
+      <p class="lede">Imagine you have investment and payment accounts. You will choose whether to accept AI agents that watch each account. Some can refuse something you ask for; others can act without being asked.</p>
       <p class="compact-copy">All accounts, money, and AI agents are pretend. This is not financial advice.</p>
       ${IS_PILOT ? `<div class="notice" style="border-color: #7c3aed; background: transparent; text-align: left;">
         <strong style="color: #7c3aed;">Pilot run — not part of the study results.</strong>
@@ -376,7 +385,12 @@
         </div>
       </div>
       <p class="compact-copy">You will see 8 proposed AI agents for different pretend accounts. <strong>Some agents will be described as using your instructions. Others will be described as using Fenrowe's instructions (the AI platform).</strong></p>
-      <p class="compact-copy"><strong>Fenrowe</strong> = the made-up AI platform name for this study. Each agent uses AI to decide when to act.</p>
+      <p class="compact-copy"><strong>Fenrowe</strong> = the made-up AI platform name for this study.</p>
+      <p class="compact-copy">Each investment account holds <strong>£100,000</strong>. Each payment account covers a
+      regular monthly bill.</p>
+      <p class="compact-copy">For some agents we will ask you to <strong>imagine you set the instructions
+      yourself</strong>. For others, Fenrowe set them. You have not written anything — imagining it is part of
+      the task.</p>
       <div class="notice">There is no right or wrong answer. We want your own view, and nothing you choose affects your payment.</div>
       <button class="primary" id="continue">Show first choice</button>
     `, "Instructions");
@@ -390,9 +404,11 @@
   function ruleDetails(c, shell) {
     const variant = SCENARIOS[c.domain][VARIANT_LABELS.indexOf(shell)];
     const arm = variant[c.authority];
+    const facts = DOMAIN_FACTS[c.domain];
     return { title: variant.title, context: variant.context,
              trigger: arm.trigger, action: arm.action, control: arm.control,
-             errorStory: arm.errorStory };
+             errorStory: arm.errorStory,
+             frequency: facts.frequency, errorRate: facts.errorRate };
   }
 
   function progressDots() {
@@ -420,7 +436,8 @@
       </div>
       <p style="margin: 1rem 0 0.5rem 0; font-weight: 600;">If you accept this agent, here's how it works:</p>
       <div class="rule-flow" aria-label="How the agent works">
-        <div class="flow-node"><small>What agent watches for</small><strong>${esc(detail.trigger)}</strong></div>
+        <div class="flow-node"><small>What agent watches for</small><strong>${esc(detail.trigger)}</strong>
+          <span style="display: block; margin-top: 0.35rem; color: #475569; font-size: 0.8rem;">${esc(detail.frequency)}</span></div>
         <span class="flow-arrow" aria-hidden="true">→</span>
         <div class="flow-node action"><small>Action</small><strong>${esc(detail.action)}</strong></div>
         <span class="flow-arrow" aria-hidden="true">→</span>
@@ -430,7 +447,7 @@
         <div style="display: flex; align-items: start; gap: 0.5rem;">
           <span style="font-size: 1.25rem;" aria-hidden="true">⚠️</span>
           <div>
-            <strong style="display: block; margin-bottom: 0.25rem;">If agent makes a mistake:</strong>
+            <strong style="display: block; margin-bottom: 0.25rem;">${esc(detail.errorRate)} it is the wrong call:</strong>
             <span style="color: #92400e;">${esc(detail.errorStory)}</span>
           </div>
         </div>
@@ -466,7 +483,8 @@
     show(`
       ${phaseIndicator(2, 4, "Your choices")}
       <span class="eyebrow">Reading check</span><h1>A quick instruction</h1>
-      <fieldset><legend>To show that you read this instruction, select "Somewhat disagree."</legend>
+      <fieldset><legend>Thinking about money can be stressful for some people. To show that you are
+      reading carefully, please ignore that statement and select <strong>"Somewhat disagree"</strong>.</legend>
         ${radio("attention", "agree", "Agree")}${radio("attention", "neutral", "Neither")}${radio("attention", "disagree", "Somewhat disagree")}
       </fieldset>
       <div id="attention-error" style="display: none; color: #dc2626; margin: 0.5rem 0; padding: 0.5rem; background: #fef2f2; border-radius: 4px; border-left: 3px solid #dc2626;">Please select one answer before continuing.</div>
@@ -682,7 +700,13 @@
       <p><strong>What was real:</strong></p>
       <ul style="margin: 0.5rem 0 1rem 1.5rem;">
         <li>Your choices and decisions</li>
+        <li>Your payment — it does not depend on any answer you gave</li>
       </ul>
+
+      <p><strong>Changed your mind?</strong></p>
+      <p class="compact-copy">Email <a href="mailto:${esc(CONSENT.email)}">${esc(CONSENT.email)}</a> with your
+      anonymous ID within ${CONSENT.withdrawalDays} days and your answers will be deleted. You keep your
+      payment either way. Questions and complaints go to the same address.</p>
 
       <div class="notice">Completion code: <code>${esc(r.completionCode)}</code></div>
       ${!DATA_ENDPOINT
