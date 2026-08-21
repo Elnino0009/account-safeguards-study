@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.1.0";
-  const INSTRUMENT_VERSION = "study-b-2.1.0";
+  const INSTRUMENT_VERSION = "study-b-2.1.1";
   const ASSIGNMENT_VERSION = "williams-variant-v3";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -86,6 +86,7 @@
     trials: [],
     attentionPass: false,
     checks: { authority: false, provenance: false, terminality: false },
+    authorityAnswer: null,
     demand: { repeats: null, guess: null },
     dataUseOk: true,
     record: null,
@@ -490,17 +491,20 @@
       ${phaseIndicator(3, 4, "Checks")}
       <span class="eyebrow">Quick check</span><h1>Three last questions</h1>
       <p class="compact-copy">These questions check you understood the key ideas:</p>
-      <fieldset><legend>What does an agent that "blocks your action" do?</legend>
-        ${radio("authority", "correct", "Stops me from doing something I tried to do")}
-        ${radio("authority", "wrong", "Does something before I try to do anything")}
+      <fieldset><legend>Imagine you told your account to <strong>sell your shares</strong>, and one of the
+      agents you just read about stepped in and cancelled it. What happened to your shares?</legend>
+        ${radio("authority", "correct", "They were NOT sold")}
+        ${radio("authority", "wrong_initiation", "They were sold for me, without me asking")}
+        ${radio("authority", "wrong_none", "They were sold, exactly as I asked")}
       </fieldset>
       <fieldset><legend>When a card said "You gave the agent its instructions"...</legend>
         ${radio("provenance", "correct", "I was described as creating those instructions")}
         ${radio("provenance", "wrong", "Fenrowe was described as creating those instructions")}
       </fieldset>
-      <fieldset><legend>If an agent blocks my sell order, what must I do to sell?</legend>
-        ${radio("terminality", "correct", "Remove the agent and place a new sell order")}
-        ${radio("terminality", "wrong", "Wait - the original order will go through automatically later")}
+      <fieldset><legend>Your sell order was cancelled by an agent, and you still want to sell.
+      What do you have to do?</legend>
+        ${radio("terminality", "correct", "Turn the agent off and place a new order myself")}
+        ${radio("terminality", "wrong", "Nothing — my original order will go through on its own later")}
       </fieldset>
       <div id="checks-error" style="display: none; color: #dc2626; margin: 0.5rem 0; padding: 0.5rem; background: #fef2f2; border-radius: 4px; border-left: 3px solid #dc2626;">Please answer all three questions before continuing.</div>
       <button class="primary" id="continue">Continue</button>
@@ -512,6 +516,12 @@
           return;
         }
       }
+      // Record which distractor was chosen, not just pass/fail. "wrong_initiation" means the
+      // participant read a veto as an initiation — the one confusion that would make the P1/P2
+      // contrasts uninterpretable, and the error the pilot actually made. "wrong_none" means they
+      // did not register that an agent acted at all. Distinguishing them is the difference between
+      // "rewrite the item" and "rewrite the cards".
+      state.authorityAnswer = checked("authority");
       state.checks = {
         authority: checked("authority") === "correct",
         provenance: checked("provenance") === "correct",
@@ -605,6 +615,7 @@
       durationMs: Date.now() - state.startedMs,
       attentionPass: state.attentionPass,
       checks: state.checks,
+      authorityAnswer: state.authorityAnswer,
       demand: state.demand,
       trials: state.trials,
       completionCode: completionCode(participantId)
