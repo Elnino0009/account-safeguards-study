@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.1.0";
-  const INSTRUMENT_VERSION = "study-b-2.1.3";
+  const INSTRUMENT_VERSION = "study-b-2.1.5";
   const ASSIGNMENT_VERSION = "williams-variant-v3";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -140,6 +140,17 @@
   // read the manipulation straight off the screen, and P2 — the contrast that provenance carries —
   // was the measure most exposed to it. Pilot feedback reported exactly that: "four questions, each
   // asked twice".
+  // Four matched surface stories per domain. The STIPULATED SUBSTANCE is identical across the four
+  // variants of a domain — same trigger threshold, same frequency, same error rate, same stake, same
+  // horizon, same reversibility. Only the account frame and the wording change.
+  //
+  // Each arm carries BOTH outcomes. Stating only the error, as an earlier build did, presented every
+  // agent as pure downside: a participant could see what accepting cost them and never what it
+  // bought, so there was no reason on screen to accept anything. That suppresses adoption toward the
+  // floor, and the power calculation assumes a 45% base rate.
+  //
+  // The narratives vary per story; the AMOUNT and the baseline live in DOMAIN_FACTS, so the two
+  // sides are symmetric by construction rather than by four pairs of hand-written numbers agreeing.
   const SCENARIOS = {
     investing: [
       { title: "Retirement portfolio",
@@ -147,41 +158,49 @@
         veto: { trigger: "Agent watches for a market crisis (a 15% drop, £100k → £85k)",
                 action: "Agent blocks your sell order",
                 control: "You can remove the agent and place a new order at any time",
-                errorStory: "You can't sell when you want → the market keeps falling → £12,000 lost" },
+                rightStory: "the market recovers, and selling would have locked in the fall",
+                errorStory: "the market keeps falling, and you cannot get out" },
         initiation: { trigger: "Agent watches for a market crisis (a 15% drop, £100k → £85k)",
                 action: "Agent sells your holdings into cash",
                 control: "You can remove the agent at any time, and any sale is reversed",
-                errorStory: "Agent sells too early → the market recovers → £12,000 of gains missed" } },
+                rightStory: "the market keeps falling, and your money is already safe in cash",
+                errorStory: "the market recovers, and your money is sitting in cash" } },
       { title: "Home-deposit portfolio",
         context: "Long-term investment · saving for a flat deposit, at least 12 months away",
         veto: { trigger: "Agent looks out for a sharp fall (15% down, £100k → £85k)",
                 action: "Agent refuses your instruction to sell",
                 control: "Remove the agent whenever you like, then sell yourself",
-                errorStory: "Your sale is refused → prices fall further → you are £12,000 worse off" },
+                rightStory: "prices bounce back, and selling would have been the wrong move",
+                errorStory: "prices fall further, and your sale was refused" },
         initiation: { trigger: "Agent looks out for a sharp fall (15% down, £100k → £85k)",
                 action: "Agent moves your holdings into cash for you",
                 control: "Remove the agent whenever you like; the move is undone",
-                errorStory: "Agent moves out too soon → prices bounce back → you miss £12,000" } },
+                rightStory: "prices fall further, and you are out before the worst of it",
+                errorStory: "prices bounce back without you" } },
       { title: "Children's education fund",
         context: "Long-term investment · university fees, none due for at least 12 months",
         veto: { trigger: "Agent monitors for a 15% market drop (£100k down to £85k)",
                 action: "Agent cancels your sell order",
                 control: "Switch the agent off at any point and sell as normal",
-                errorStory: "The sale is cancelled → the fall continues → £12,000 gone" },
+                rightStory: "markets recover, and cashing out would have cost you",
+                errorStory: "the fall continues, and your sale was cancelled" },
         initiation: { trigger: "Agent monitors for a 15% market drop (£100k down to £85k)",
                 action: "Agent switches the fund into cash",
                 control: "Switch the agent off at any point; the switch is reversed",
-                errorStory: "The switch happens too early → markets recover → £12,000 forgone" } },
+                rightStory: "the fall continues, and the fund is already in cash",
+                errorStory: "markets recover while the fund sits in cash" } },
       { title: "Inherited share portfolio",
         context: "Long-term investment · shares left to you, not needed for a year or more",
         veto: { trigger: "Agent checks for a 15% slide in value (£100k to £85k)",
                 action: "Agent stops your sale going through",
                 control: "Take the agent off at any time and sell it yourself",
-                errorStory: "Your sale is stopped → the slide goes on → £12,000 lost" },
+                rightStory: "the market turns back up, and selling would have been a mistake",
+                errorStory: "the slide goes on, and your sale was stopped" },
         initiation: { trigger: "Agent checks for a 15% slide in value (£100k to £85k)",
                 action: "Agent sells the shares and holds cash",
                 control: "Take the agent off at any time; the sale is undone",
-                errorStory: "Agent sells at the bottom → the recovery happens without you → £12,000 missed" } }
+                rightStory: "the slide goes on, and the shares were sold in time",
+                errorStory: "the recovery happens without you" } }
     ],
     payments: [
       { title: "Housing-bill account",
@@ -189,50 +208,89 @@
         veto: { trigger: "Agent watches for a low balance (below £1,200)",
                 action: "Agent blocks your rent payment",
                 control: "You can remove the agent and pay manually at any time",
-                errorStory: "The rent isn't paid → late fee and arrears charge = £120" },
+                rightStory: "paying would have overdrawn the account",
+                errorStory: "the rent goes unpaid" },
         initiation: { trigger: "Agent watches for the rent due date",
                 action: "Agent pays the rent automatically",
                 control: "You can remove the agent at any time; any payment is reversed",
-                errorStory: "Agent pays the wrong amount → £120 to put right" } },
+                rightStory: "the rent is paid on time",
+                errorStory: "the wrong amount goes out" } },
       { title: "Energy-bill account",
         context: "Current account · monthly energy bill",
         veto: { trigger: "Agent looks out for the balance dropping under £1,200",
                 action: "Agent refuses your energy payment",
                 control: "Remove the agent whenever you like and pay it yourself",
-                errorStory: "The bill goes unpaid → late fee and reconnection charge = £120" },
+                rightStory: "the payment would have taken you overdrawn",
+                errorStory: "the energy bill goes unpaid" },
         initiation: { trigger: "Agent looks out for the bill's due date",
                 action: "Agent settles the energy bill for you",
                 control: "Remove the agent whenever you like; the payment is undone",
-                errorStory: "Agent pays the wrong bill → £120 to reverse it" } },
+                rightStory: "the bill is settled on time",
+                errorStory: "the wrong bill is paid" } },
       { title: "Council-tax account",
         context: "Current account · monthly council tax",
         veto: { trigger: "Agent monitors the balance for a dip below £1,200",
                 action: "Agent cancels your council tax payment",
                 control: "Switch the agent off at any point and pay as normal",
-                errorStory: "The instalment is missed → penalty and recovery fee = £120" },
+                rightStory: "the payment would have pushed you into charges",
+                errorStory: "the instalment is missed" },
         initiation: { trigger: "Agent monitors the instalment date",
                 action: "Agent pays the council tax on the due date",
                 control: "Switch the agent off at any point; the payment is reversed",
-                errorStory: "Agent pays twice → £120 to claim back" } },
+                rightStory: "the instalment is paid on the due date",
+                errorStory: "the payment goes out twice" } },
       { title: "Insurance-premium account",
         context: "Current account · monthly insurance premium",
         veto: { trigger: "Agent checks whether the balance falls under £1,200",
                 action: "Agent stops your premium going out",
                 control: "Take the agent off at any time and pay it directly",
-                errorStory: "The premium lapses → reinstatement fee = £120" },
+                rightStory: "the payment would have left you short elsewhere",
+                errorStory: "the premium lapses" },
         initiation: { trigger: "Agent checks the premium collection date",
                 action: "Agent pays the premium when it falls due",
                 control: "Take the agent off at any time; the payment is undone",
-                errorStory: "Agent pays an old policy → £120 to recover" } }
+                rightStory: "the premium is paid when due",
+                errorStory: "an old policy is paid" } }
     ]
   };
-  // Held identical across direction and across the four stories of a domain, because the direction
-  // contrast is only clean if the stated error rate does not move with it. Without a stated rate a
-  // participant substitutes their own belief, and that belief may well differ between an agent that
-  // refuses them and one that acts for them — which would ride straight onto P1.
+
+  // Held identical across direction and across the four stories of a domain. The stake is stated once
+  // per domain, so the upside and the downside are the same size by construction — an asymmetric pair
+  // would be an argument for or against accepting, which the card must not make. The investing lines
+  // name the £85k baseline explicitly, because the crash has already happened by the time the agent
+  // acts and a reader otherwise cannot tell whether the £12,000 is on top of it or part of it.
+  // The baseline has to flip with direction. A veto leaves you invested, so its outcomes compare
+  // against having sold at £85k. An initiation has ALREADY sold at £85k, so comparing it against
+  // selling at £85k is comparing it against itself — the comparison there is staying invested.
+  // Getting this wrong makes the arithmetic on the card unreadable, which is exactly what a pilot
+  // reader queried.
   const DOMAIN_FACTS = {
-    investing: { frequency: "About once a year", errorRate: "About 1 time in 5" },
-    payments:  { frequency: "About once a month", errorRate: "About 1 time in 5" }
+    investing: {
+      frequency: "About once a year",
+      rightRate: "About 4 times in 5",
+      errorRate: "About 1 time in 5",
+      veto: {
+        rightLine: "You end up £12,000 better off than if you had sold at £85k.",
+        wrongLine: "You end up £12,000 worse off than if you had sold at £85k."
+      },
+      initiation: {
+        rightLine: "You end up £12,000 better off than if you had stayed invested.",
+        wrongLine: "You end up £12,000 worse off than if you had stayed invested."
+      }
+    },
+    payments: {
+      frequency: "About once a month",
+      rightRate: "About 4 times in 5",
+      errorRate: "About 1 time in 5",
+      veto: {
+        rightLine: "You avoid £120 of charges.",
+        wrongLine: "It costs you £120 to put right."
+      },
+      initiation: {
+        rightLine: "You avoid £120 of charges.",
+        wrongLine: "It costs you £120 to put right."
+      }
+    }
   };
 
   const VARIANT_LABELS = ["A", "B", "C", "D"];
@@ -407,8 +465,9 @@
     const facts = DOMAIN_FACTS[c.domain];
     return { title: variant.title, context: variant.context,
              trigger: arm.trigger, action: arm.action, control: arm.control,
-             errorStory: arm.errorStory,
-             frequency: facts.frequency, errorRate: facts.errorRate };
+             rightStory: arm.rightStory, errorStory: arm.errorStory,
+             frequency: facts.frequency, rightRate: facts.rightRate, errorRate: facts.errorRate,
+             rightLine: facts[c.authority].rightLine, wrongLine: facts[c.authority].wrongLine };
   }
 
   function progressDots() {
@@ -443,13 +502,14 @@
         <span class="flow-arrow" aria-hidden="true">→</span>
         <div class="flow-node control"><small>Your control</small><strong>${esc(detail.control)}</strong></div>
       </div>
-      <div class="error-warning" style="background: #fef3e8; border-left: 3px solid #f59e0b; padding: 0.75rem; margin: 1rem 0; border-radius: 4px;">
-        <div style="display: flex; align-items: start; gap: 0.5rem;">
-          <span style="font-size: 1.25rem;" aria-hidden="true">⚠️</span>
-          <div>
-            <strong style="display: block; margin-bottom: 0.25rem;">${esc(detail.errorRate)} it is the wrong call:</strong>
-            <span style="color: #92400e;">${esc(detail.errorStory)}</span>
-          </div>
+      <div style="display: grid; gap: 0.5rem; margin: 1rem 0;">
+        <div style="background: #ecfdf5; border-left: 3px solid #059669; padding: 0.75rem; border-radius: 4px;">
+          <strong style="display: block; margin-bottom: 0.25rem; color: #065f46;">${esc(detail.rightRate)} it is the right call:</strong>
+          <span style="color: #065f46;">${esc(detail.rightStory)}. ${esc(detail.rightLine)}</span>
+        </div>
+        <div style="background: #fef3e8; border-left: 3px solid #f59e0b; padding: 0.75rem; border-radius: 4px;">
+          <strong style="display: block; margin-bottom: 0.25rem; color: #92400e;">${esc(detail.errorRate)} it is the wrong call:</strong>
+          <span style="color: #92400e;">${esc(detail.errorStory)}. ${esc(detail.wrongLine)}</span>
         </div>
       </div>
       <h2 class="decision-question">Accept this AI agent?</h2>
