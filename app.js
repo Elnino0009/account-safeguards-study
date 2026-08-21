@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.1.0";
-  const INSTRUMENT_VERSION = "study-b-2.1.1";
+  const INSTRUMENT_VERSION = "study-b-2.1.2";
   const ASSIGNMENT_VERSION = "williams-variant-v3";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -307,7 +307,7 @@
       <span class="eyebrow">AI agents study</span>
       <h1>Choose AI agents for your accounts</h1>
       <p class="lede">Imagine you have investment and payment accounts. You will choose whether to accept AI agents that watch each account and can act on your behalf.</p>
-      <p class="compact-copy">All accounts, money, and AI agents are pretend. Takes about 7 minutes. This is not financial advice.</p>
+      <p class="compact-copy">All accounts, money, and AI agents are pretend. This is not financial advice.</p>
       ${IS_PILOT ? `<div class="notice" style="border-color: #7c3aed; background: transparent; text-align: left;">
         <strong style="color: #7c3aed;">Pilot run — not part of the study results.</strong>
         <p class="compact-copy" style="margin: 6px 0 0;">You were invited directly. Your answers help check
@@ -409,7 +409,7 @@
     const detail = ruleDetails(c, shell);
     const firstCardNotice = state.trialCursor === 0 ? '<p class="compact-copy" style="margin-bottom: 1rem;"><strong>Remember:</strong> Everything is pretend. Imagine how you would feel if it was real.</p>' : '';
     show(`
-      <span class="eyebrow">Choice ${state.trialCursor + 1} of 8</span>
+      ${phaseIndicator(2, 4, "Your choices")}
       ${progressDots()}
       <h1>${esc(detail.title)}</h1>
       <p class="context-line">${esc(detail.context)}</p>
@@ -464,7 +464,7 @@
 
   function renderAttention() {
     show(`
-      ${phaseIndicator(3, 4, "Checks")}
+      ${phaseIndicator(2, 4, "Your choices")}
       <span class="eyebrow">Reading check</span><h1>A quick instruction</h1>
       <fieldset><legend>To show that you read this instruction, select "Somewhat disagree."</legend>
         ${radio("attention", "agree", "Agree")}${radio("attention", "neutral", "Neither")}${radio("attention", "disagree", "Somewhat disagree")}
@@ -489,7 +489,7 @@
   function renderChecks() {
     show(`
       ${phaseIndicator(3, 4, "Checks")}
-      <span class="eyebrow">Quick check</span><h1>Three last questions</h1>
+      <span class="eyebrow">Quick check</span><h1>Three quick questions</h1>
       <p class="compact-copy">These questions check you understood the key ideas:</p>
       <fieldset><legend>Imagine you told your account to <strong>sell your shares</strong>, and one of the
       agents you just read about stepped in and cancelled it. What happened to your shares?</legend>
@@ -545,7 +545,7 @@
   function renderDemand() {
     show(`
       ${phaseIndicator(3, 4, "Checks")}
-      <span class="eyebrow">Last two questions</span><h1>About the task</h1>
+      <span class="eyebrow">Almost done</span><h1>Two last questions</h1>
       <p class="compact-copy">These help us understand how the task read. There are no wrong answers,
       and your payment does not depend on them.</p>
       <fieldset><legend>Did any of the eight situations feel like repeats of each other?</legend>
