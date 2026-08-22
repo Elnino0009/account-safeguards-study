@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.3.0";
-  const INSTRUMENT_VERSION = "study-b-2.3.6";
+  const INSTRUMENT_VERSION = "study-b-2.3.7";
   const ASSIGNMENT_VERSION = "williams-counter-perm-v4";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -317,7 +317,7 @@
     investing: [
       { title: "Retirement portfolio",
         context: "Long-term investment · money for retirement, not needed for at least 12 months",
-        trigger: "Only once a market crisis takes it down {pct} (£100k → {floor})",
+        trigger: "Only after a crash takes the account down {pct} (£100k → {floor})",
         veto: { forecast: "the fall will turn around, so selling now would be a mistake",
                 action: "Blocks your sell order",
                 rightStory: "the fall does turn around, and selling would have locked in the loss",
@@ -328,7 +328,7 @@
                 errorStory: "the fall turns around, and your money is sitting in cash" } },
       { title: "Home-deposit portfolio",
         context: "Long-term investment · saving for a flat deposit, at least 12 months away",
-        trigger: "Not until a sharp fall of {pct} (£100k → {floor})",
+        trigger: "Not until the account has fallen {pct} (£100k → {floor})",
         veto: { forecast: "prices will bounce back, so selling now would be the wrong move",
                 action: "Refuses your instruction to sell",
                 rightStory: "prices do bounce back, and selling would have been the wrong move",
@@ -350,7 +350,7 @@
                 errorStory: "the market recovers while the fund sits in cash" } },
       { title: "Inherited share portfolio",
         context: "Long-term investment · shares left to you, not needed for a year or more",
-        trigger: "Only once values slide {pct} (£100k to {floor})",
+        trigger: "Only once the account is down {pct} (£100k to {floor})",
         veto: { forecast: "the market will turn back up, so selling now would be a mistake",
                 action: "Stops your sale going through",
                 rightStory: "the market does turn back up, and selling would have been a mistake",
@@ -363,7 +363,7 @@
     payments: [
       { title: "Housing-bill account",
         context: "Current account · monthly rent payment",
-        trigger: "Only when the rent falls due with the balance under {floor}",
+        trigger: "Only when the rent is due and the balance is under {floor}",
         veto: { forecast: "you will need the money in the account more than you need the rent paid today",
                 action: "Cancels the rent payment you asked for",
                 rightStory: "you did need the money, and paying would have left you short",
@@ -374,7 +374,7 @@
                 errorStory: "you needed the money more, and the account is left short" } },
       { title: "Energy-bill account",
         context: "Current account · monthly energy bill",
-        trigger: "Not until the energy bill falls due with the balance under {floor}",
+        trigger: "Not until the energy bill is due and the balance is under {floor}",
         veto: { forecast: "you will need the money in the account more than you need this bill settled today",
                 action: "Refuses the energy payment you asked for",
                 rightStory: "you did need the money, and the payment would have taken you too low",
@@ -385,7 +385,7 @@
                 errorStory: "you needed the money more, and the account is left short" } },
       { title: "Council-tax account",
         context: "Current account · monthly council tax",
-        trigger: "Only when the council tax instalment falls due with the balance under {floor}",
+        trigger: "Only when council tax is due and the balance is under {floor}",
         veto: { forecast: "you will need the money in the account more than you need this instalment paid today",
                 action: "Cancels the council tax payment you asked for",
                 rightStory: "you did need the money, and paying would have pushed you into charges",
@@ -396,7 +396,7 @@
                 errorStory: "you needed the money more, and the account is left short" } },
       { title: "Insurance-premium account",
         context: "Current account · monthly insurance premium",
-        trigger: "Only once the premium falls due with the balance under {floor}",
+        trigger: "Only once the premium is due and the balance is under {floor}",
         veto: { forecast: "you will need the money in the account more than you need the premium paid today",
                 action: "Stops the premium payment you asked for",
                 rightStory: "you did need the money, and the payment would have left you short elsewhere",
