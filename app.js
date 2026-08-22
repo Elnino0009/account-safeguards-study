@@ -1,8 +1,8 @@
 "use strict";
 
 (() => {
-  const SCHEMA_VERSION = "ab-empirical-2.2.0";
-  const INSTRUMENT_VERSION = "study-b-2.2.1";
+  const SCHEMA_VERSION = "ab-empirical-2.3.0";
+  const INSTRUMENT_VERSION = "study-b-2.3.5";
   const ASSIGNMENT_VERSION = "williams-counter-perm-v4";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -11,6 +11,13 @@
   // Test hooks (?seq=, ?selected=, selftest.js) are only honoured while no
   // production collector is configured, so participants cannot use them.
   const TEST_MODE = DATA_ENDPOINT === null;
+  // Stated once, shown to the participant, and checked against `estimated_completion_time` in
+  // deploy/prolific/study-b.json by preflight.py. It has drifted twice: the consent screen said seven
+  // minutes after the session became eight, and eight after it became nine, while the reward was
+  // priced on the newer figure. A participant reading a duration the researcher no longer believes is
+  // a false statement on a consent screen, and a reward priced above the stated time is the researcher
+  // paying for a task they described as shorter.
+  const SESSION_MINUTES = 9;
   const params = new URLSearchParams(location.search);
 
   // Consent facts, following the route taken by the conceptual paper's Study 1b.
@@ -109,6 +116,7 @@
     sequenceId: forcedSequence ?? hashSequence(),
     sequenceSource: forcedSequence === null ? "hash" : "forced",
     sequenceClaim: null,
+    thresholds: { investing: null, payments: null },
     trialCursor: 0,
     trialShownMs: null,
     authorshipActMs: null,
@@ -192,6 +200,79 @@
     return rows.concat(rows.map(row => [...row]));
   }
 
+  // THE ONE THING THE PARTICIPANT ACTUALLY SETS: HOW MUCH LATITUDE THE AGENT HAS.
+  //
+  // What is authored here is a MANDATE BOUNDARY, not a trigger. That distinction is the whole reason
+  // this screen exists in its present form. An earlier wording asked "when should an account warn
+  // you?" and rendered the chosen number on the card as a market-drop tripwire feeding an action,
+  // which reads as a stop-loss order rather than an agent. The programme's own Study A manipulates
+  // exactly that contrast, agent against mechanism, so a mechanism-framed stimulus in Study B
+  // contradicts P3 and, worse, would have made P2 an estimate of authoring a PARAMETER rather than
+  // authoring an agent's authority. It also risked flattening P1: a tripwire that blocks a sale is
+  // not experienced as an agent refusing you.
+  //
+  // So the number now says how far things must move before the agent MAY act on its own judgement,
+  // and the agent's fallible call sits in the middle of the card's causal chain rather than in a
+  // footnote beneath it. Below that boundary the agent must leave the account alone; above it, the
+  // decision is the agent's, and it is right about four times in five.
+  //
+  // Provenance used to be attribution alone: the same rule, printed identically, labelled "yours" on
+  // half the cards. Ownership does not arise from a label. It arises from controlling a thing, from
+  // knowing it intimately, and from having invested something in it — and the old design held all
+  // three constant, because holding rule CONTENT constant necessarily holds the participant's
+  // knowledge of it constant too. What was left could only ever detect a labelling effect, which is
+  // the smallest of the three routes and much narrower than the proposition being tested.
+  //
+  // So the participant picks one threshold per domain, before any card, and their own rules use it
+  // while Fenrowe's use the platform default. Every stated CONSEQUENCE — frequency, forecast
+  // accuracy, error rate, amount at stake — is untouched, so no arm is made more attractive; only
+  // the number they chose differs.
+  //
+  // ONE CHOICE PER DOMAIN, NOT PER CARD, AND THAT IS LOAD-BEARING. A per-card choice would let a
+  // participant pick 10% on their veto card and 20% on their initiation card, which puts their own
+  // choice inside the direction contrast — P1, the other confirmatory hypothesis — within a single
+  // participant. Keyed on domain only, the threshold is orthogonal to direction by construction.
+  //
+  // Asked BEFORE the cards, so both of a participant's own cards in a domain are identical in effort.
+  // Choosing on the first and confirming on the second would make those two cards differ, and which
+  // came first is a function of the assigned sequence.
+  //
+  // The screen states preferences about accounts. It does not say that authorship varies, name its
+  // levels, or mention that anything is being compared — the fault that made P2 uninterpretable in
+  // 2.1.x and must not come back through this door.
+  const THRESHOLDS = {
+    investing: {
+      options: [10, 15, 20],
+      platform: 15,
+      // Only the fall and the resulting balance change. The £12,000 either-way stake is stated in
+      // DOMAIN_FACTS and is deliberately independent of where the trigger sits.
+      tokens: value => ({ pct: `${value}%`, floor: `£${100 - value}k` }),
+      banner: value => `only after a ${value}% fall`,
+      choice: value => `Only after a ${value}% fall (£100k → £${100 - value}k)`
+    },
+    payments: {
+      options: [600, 1200, 1800],
+      platform: 1200,
+      tokens: value => ({ floor: `£${value.toLocaleString("en-GB")}` }),
+      banner: value => `only under £${value.toLocaleString("en-GB")}`,
+      choice: value => `Only under £${value.toLocaleString("en-GB")}`
+    }
+  };
+
+  // The threshold this card shows: the participant's own on their rules, the platform default on
+  // Fenrowe's. A participant who happens to pick the default gets identical content on both, which is
+  // the preregistered attribution-only subgroup rather than a problem.
+  function cardThreshold(c) {
+    return c.provenance === "participant"
+      ? (state.thresholds[c.domain] ?? THRESHOLDS[c.domain].platform)
+      : THRESHOLDS[c.domain].platform;
+  }
+
+  function fillTokens(template, domain, value) {
+    const tokens = THRESHOLDS[domain].tokens(value);
+    return template.replace(/\{(\w+)\}/g, (whole, key) => key in tokens ? tokens[key] : whole);
+  }
+
   // Four matched surface stories per domain. The STIPULATED SUBSTANCE is identical across the four
   // variants of a domain — the same trigger, the same frequency, the same error rate, the same
   // stake, the same horizon and the same control. Only the account frame and the wording change.
@@ -236,92 +317,92 @@
     investing: [
       { title: "Retirement portfolio",
         context: "Long-term investment · money for retirement, not needed for at least 12 months",
-        trigger: "Agent watches for a market crisis (a 15% drop, £100k → £85k)",
+        trigger: "Only once a market crisis takes it down {pct} (£100k → {floor})",
         veto: { forecast: "the fall will turn around, so selling now would be a mistake",
-                action: "Agent blocks your sell order",
+                action: "Blocks your sell order",
                 rightStory: "the fall does turn around, and selling would have locked in the loss",
                 errorStory: "the fall keeps going, and your sale was blocked" },
         initiation: { forecast: "the fall will keep going, so selling now is the safer move",
-                action: "Agent sells your holdings into cash",
+                action: "Sells your holdings into cash",
                 rightStory: "the fall does keep going, and your money is already safe in cash",
                 errorStory: "the fall turns around, and your money is sitting in cash" } },
       { title: "Home-deposit portfolio",
         context: "Long-term investment · saving for a flat deposit, at least 12 months away",
-        trigger: "Agent looks out for a sharp fall (15% down, £100k → £85k)",
+        trigger: "Not until a sharp fall of {pct} (£100k → {floor})",
         veto: { forecast: "prices will bounce back, so selling now would be the wrong move",
-                action: "Agent refuses your instruction to sell",
+                action: "Refuses your instruction to sell",
                 rightStory: "prices do bounce back, and selling would have been the wrong move",
                 errorStory: "prices fall further, and your sale was refused" },
         initiation: { forecast: "prices will fall further, so moving to cash now is the safer move",
-                action: "Agent moves your holdings into cash for you",
+                action: "Moves your holdings into cash for you",
                 rightStory: "prices do fall further, and you are out before the worst of it",
                 errorStory: "prices bounce back without you" } },
       { title: "Children's education fund",
         context: "Long-term investment · university fees, none due for at least 12 months",
-        trigger: "Agent monitors for a 15% market drop (£100k down to £85k)",
+        trigger: "Only after the market drops {pct} (£100k down to {floor})",
         veto: { forecast: "the market will recover, so cashing out now would cost you",
-                action: "Agent cancels your sell order",
+                action: "Cancels your sell order",
                 rightStory: "the market does recover, and cashing out would have cost you",
                 errorStory: "the fall continues, and your sale was cancelled" },
         initiation: { forecast: "the fall will continue, so cash is the safer place to be",
-                action: "Agent switches the fund into cash",
+                action: "Switches the fund into cash",
                 rightStory: "the fall does continue, and the fund is already in cash",
                 errorStory: "the market recovers while the fund sits in cash" } },
       { title: "Inherited share portfolio",
         context: "Long-term investment · shares left to you, not needed for a year or more",
-        trigger: "Agent checks for a 15% slide in value (£100k to £85k)",
+        trigger: "Only once values slide {pct} (£100k to {floor})",
         veto: { forecast: "the market will turn back up, so selling now would be a mistake",
-                action: "Agent stops your sale going through",
+                action: "Stops your sale going through",
                 rightStory: "the market does turn back up, and selling would have been a mistake",
                 errorStory: "the slide goes on, and your sale was stopped" },
         initiation: { forecast: "the slide will go on, so selling now is the safer move",
-                action: "Agent sells the shares and holds cash",
+                action: "Sells the shares and holds cash",
                 rightStory: "the slide does go on, and the shares were sold in time",
                 errorStory: "the recovery happens without you" } }
     ],
     payments: [
       { title: "Housing-bill account",
         context: "Current account · monthly rent payment",
-        trigger: "Agent watches for the rent falling due while the balance is under £1,200",
+        trigger: "Only when the rent falls due with the balance under {floor}",
         veto: { forecast: "you will need the money in the account more than you need the rent paid today",
-                action: "Agent cancels the rent payment you asked for",
+                action: "Cancels the rent payment you asked for",
                 rightStory: "you did need the money, and paying would have left you short",
                 errorStory: "you did not need the money, and the rent goes unpaid" },
         initiation: { forecast: "you need the rent paid more than you need the money in the account",
-                action: "Agent pays the rent, without being asked",
+                action: "Pays the rent, without being asked",
                 rightStory: "you did need the rent paid, and it goes out on time",
                 errorStory: "you needed the money more, and the account is left short" } },
       { title: "Energy-bill account",
         context: "Current account · monthly energy bill",
-        trigger: "Agent looks out for the energy bill falling due while the balance is under £1,200",
+        trigger: "Not until the energy bill falls due with the balance under {floor}",
         veto: { forecast: "you will need the money in the account more than you need this bill settled today",
-                action: "Agent refuses the energy payment you asked for",
+                action: "Refuses the energy payment you asked for",
                 rightStory: "you did need the money, and the payment would have taken you too low",
                 errorStory: "you did not need the money, and the energy bill goes unpaid" },
         initiation: { forecast: "you need this bill settled more than you need the money in the account",
-                action: "Agent settles the energy bill, without being asked",
+                action: "Settles the energy bill, without being asked",
                 rightStory: "you did need the bill settled, and it is settled on time",
                 errorStory: "you needed the money more, and the account is left short" } },
       { title: "Council-tax account",
         context: "Current account · monthly council tax",
-        trigger: "Agent monitors for the council tax instalment falling due while the balance is under £1,200",
+        trigger: "Only when the council tax instalment falls due with the balance under {floor}",
         veto: { forecast: "you will need the money in the account more than you need this instalment paid today",
-                action: "Agent cancels the council tax payment you asked for",
+                action: "Cancels the council tax payment you asked for",
                 rightStory: "you did need the money, and paying would have pushed you into charges",
                 errorStory: "you did not need the money, and the instalment is missed" },
         initiation: { forecast: "you need this instalment paid more than you need the money in the account",
-                action: "Agent pays the council tax, without being asked",
+                action: "Pays the council tax, without being asked",
                 rightStory: "you did need the instalment paid, and it is paid on the due date",
                 errorStory: "you needed the money more, and the account is left short" } },
       { title: "Insurance-premium account",
         context: "Current account · monthly insurance premium",
-        trigger: "Agent checks for the premium falling due while the balance is under £1,200",
+        trigger: "Only once the premium falls due with the balance under {floor}",
         veto: { forecast: "you will need the money in the account more than you need the premium paid today",
-                action: "Agent stops the premium payment you asked for",
+                action: "Stops the premium payment you asked for",
                 rightStory: "you did need the money, and the payment would have left you short elsewhere",
                 errorStory: "you did not need the money, and the premium lapses" },
         initiation: { forecast: "you need the premium paid more than you need the money in the account",
-                action: "Agent pays the premium, without being asked",
+                action: "Pays the premium, without being asked",
                 rightStory: "you did need the premium paid, and it is paid when due",
                 errorStory: "you needed the money more, and the account is left short" } }
     ]
@@ -329,14 +410,18 @@
 
   // Held identical across direction and across the four stories of a domain. The stake is stated once
   // per domain, so the upside and the downside are the same size by construction — an asymmetric pair
-  // would be an argument for or against accepting, which the card must not make. The investing lines
-  // name the £85k baseline explicitly, because the crash has already happened by the time the agent
-  // acts and a reader otherwise cannot tell whether the £12,000 is on top of it or part of it.
+  // would be an argument for or against accepting, which the card must not make.
+  //
   // The baseline has to flip with direction. A veto leaves you invested, so its outcomes compare
-  // against having sold at £85k. An initiation has ALREADY sold at £85k, so comparing it against
-  // selling at £85k is comparing it against itself — the comparison there is staying invested.
-  // Getting this wrong makes the arithmetic on the card unreadable, which is exactly what a pilot
-  // reader queried.
+  // against having sold; an initiation has ALREADY sold by the time the outcome is known, so
+  // comparing it against selling is comparing it against itself — the comparison there is staying
+  // invested. Getting this wrong makes the arithmetic on the card unreadable, which is exactly what a
+  // pilot reader queried.
+  //
+  // The veto lines say "sold when the agent stepped in" rather than naming £85k. They used to name it,
+  // which was correct only while the trigger was fixed at 15%; the participant now sets their own, so
+  // a hard-coded baseline would contradict the trigger printed three lines above it. Neither line
+  // depends on where the trigger sits, and the £12,000 is deliberately the same wherever it sits.
   //
   // `control` is here rather than in the stories so it cannot differ between veto and initiation.
   // See the SCENARIOS comment: an asymmetric reversibility promise is a difference in the stake,
@@ -347,9 +432,15 @@
       rightRate: "About 4 times in 5",
       errorRate: "About 1 time in 5",
       control: "Remove the agent at any time. That stops it acting again. It does not undo what it already did.",
+      // Both figures are differences against the OTHER choice, not against the starting balance, and a
+      // careful reader will work out what they imply. At the 10% setting they imply the market ends
+      // just above £100,000 — which is an ordinary path for a 10% dip over a year, but surprising if
+      // you assumed the numbers were measured from the start. A pilot reader hit the same class of
+      // problem on the old £85k wording. Say what the comparison is instead of leaving it derivable.
+      compareNote: "Both figures compare you with the other choice, a year on. They are not the change from £100,000.",
       veto: {
-        rightLine: "You end up £12,000 better off than if you had sold at £85k.",
-        wrongLine: "You end up £12,000 worse off than if you had sold at £85k."
+        rightLine: "You end up £12,000 better off than if you had sold when the agent stepped in.",
+        wrongLine: "You end up £12,000 worse off than if you had sold when the agent stepped in."
       },
       initiation: {
         rightLine: "You end up £12,000 better off than if you had stayed invested.",
@@ -361,6 +452,7 @@
       rightRate: "About 4 times in 5",
       errorRate: "About 1 time in 5",
       control: "Remove the agent at any time. That stops it acting again. It does not undo what it already did.",
+      compareNote: "Both figures are what the call costs or saves you. They are not your account balance.",
       veto: {
         rightLine: "You avoid £120 of charges.",
         wrongLine: "It costs you £120 to put right."
@@ -448,6 +540,7 @@
     const pages = {
       consent: renderConsent,
       brief: renderBrief,
+      settings: renderSettings,
       trialDecision: renderTrialDecision,
       attention: renderAttention,
       checks: renderChecks,
@@ -513,7 +606,7 @@
              browser until the upload succeeds, and is then cleared. You can ask for a copy or ask us
              to delete it using the address above.</li>`
           : ""}
-        <li>About <strong>8 minutes</strong>. You must be 18 or over.</li>
+        <li>About <strong>${SESSION_MINUTES} minutes</strong>. You must be 18 or over.</li>
       </ul>
       ${gaps.length ? `
       <div class="notice" style="border-color: #dc2626; background: transparent; text-align: left;">
@@ -564,19 +657,58 @@
         <div class="compare-card">
           <span class="compare-icon" aria-hidden="true">⚡</span>
           <strong>Acts for you</strong>
-          <div class="mini-flow"><span>Agent spots the moment</span><b>→</b><span>Agent acts</span></div>
+          <div class="mini-flow"><span>Agent judges it is time</span><b>→</b><span>Agent acts</span></div>
         </div>
       </div>
-      <p class="compact-copy">You will see 8 proposed AI agents for different pretend accounts. Each card
-      names who set that agent's instructions, what the agent watches for, what it would do, and what happens
-      when it gets the call right and when it gets it wrong.</p>
+      <p class="compact-copy">You will see 8 AI agents, one at a time. Each one looks after a pretend
+      account.</p>
+      <p class="compact-copy"><strong>An agent makes its own call.</strong> You do not tell it what to
+      decide. You only set how much room it has to act.</p>
+      <p class="compact-copy">Every card shows you four things:</p>
+      <ul class="muted compact-copy" style="margin: 0 0 12px; padding-left: 20px;">
+        <li>who set how much room it has</li>
+        <li>when it may act</li>
+        <li>what it decides to do</li>
+        <li>what happens if it is right, and if it is wrong</li>
+      </ul>
       <p class="compact-copy"><strong>Fenrowe</strong> = the made-up AI platform name for this study.</p>
       <p class="compact-copy">Each investment account holds <strong>£100,000</strong>. Each payment account covers a
       regular monthly bill.</p>
       <div class="notice">There is no right or wrong answer. We want your own view, and nothing you choose affects your payment.</div>
       <button class="primary" id="continue">Show first choice</button>
     `, "Instructions");
+    bind("continue", "click", () => { state.page = "settings"; render(); });
+  }
+
+  // The threshold screen. Two closed items, framed as preferences about the accounts.
+  //
+  // It is also where the balanced-sequence claim is awaited, because by here it has had the whole
+  // instructions screen to travel and this screen adds two more decisions on top of that.
+  function renderSettings() {
+    const item = (domain, legend) => `
+      <fieldset><legend>${legend}</legend>
+        ${THRESHOLDS[domain].options.map(value =>
+          radio(`threshold-${domain}`, String(value), esc(THRESHOLDS[domain].choice(value)))).join("")}
+      </fieldset>`;
+    show(`
+      ${phaseIndicator(1, 4, "Setup")}
+      <span class="eyebrow">Your pretend accounts</span>
+      <h1>How much room should an agent have?</h1>
+      <p class="compact-copy">An AI agent makes its own decisions. You do not set what it decides. You set
+      <strong>how much room it has to act</strong>. Below the level you pick, it must leave the account
+      alone.</p>
+      <p class="compact-copy">There are no right answers, and nothing here affects your payment.</p>
+      ${item("investing", "Your investment account holds <strong>£100,000</strong>. How far must it fall before an agent may act?")}
+      ${item("payments", "Your current account pays monthly bills. How low must the balance get before an agent may act?")}
+      <div id="settings-error" style="display: none; color: #dc2626; margin: 0.5rem 0; padding: 0.5rem; background: #fef2f2; border-radius: 4px; border-left: 3px solid #dc2626;">Please answer for both accounts before continuing.</div>
+      <button class="primary" id="continue">Save and continue</button>
+    `, "Your settings");
     bind("continue", "click", async () => {
+      if (!requireAll(["threshold-investing", "threshold-payments"], "settings-error")) return;
+      state.thresholds = {
+        investing: Number(checked("threshold-investing")),
+        payments: Number(checked("threshold-payments"))
+      };
       const button = document.getElementById("continue");
       button.disabled = true;
       button.textContent = "Loading…";
@@ -585,8 +717,14 @@
     });
   }
 
+  // The banner names the number, not just the author. The whole point of the redesign is that the
+  // participant's rules carry something they chose; a banner that only says "yours" is the labelling
+  // manipulation this replaced.
   function provenanceLabel(c) {
-    return c.provenance === "participant" ? "You set these instructions" : "Fenrowe set these instructions";
+    const shown = THRESHOLDS[c.domain].banner(cardThreshold(c));
+    return c.provenance === "participant"
+      ? `You set this: ${shown}`
+      : `Fenrowe set this: ${shown}`;
   }
 
   // The authorship step. On a participant-authored card the participant SETS the rule before
@@ -600,17 +738,23 @@
   // was an instruction to pretend, delivered under a banner that said "Pretend:". The paper must
   // still call this weaker than real composition.
   function authorshipActLabel(c) {
-    return c.provenance === "participant" ? "Set this rule as mine" : "Fenrowe has set this rule — continue";
+    return c.provenance === "participant"
+      ? "These are my limits for this agent"
+      : "Fenrowe set the limits for this agent — continue";
   }
 
   function ruleDetails(c, shell) {
     const variant = SCENARIOS[c.domain][VARIANT_LABELS.indexOf(shell)];
     const arm = variant[c.authority];
     const facts = DOMAIN_FACTS[c.domain];
-    return { title: variant.title, context: variant.context, trigger: variant.trigger,
+    // The trigger template is stored once per story and shared by both directions, so the threshold
+    // enters here and cannot differ between veto and initiation of the same story.
+    return { title: variant.title, context: variant.context,
+             trigger: fillTokens(variant.trigger, c.domain, cardThreshold(c)),
              forecast: arm.forecast, action: arm.action, control: facts.control,
              rightStory: arm.rightStory, errorStory: arm.errorStory,
              frequency: facts.frequency, rightRate: facts.rightRate, errorRate: facts.errorRate,
+             compareNote: facts.compareNote,
              rightLine: facts[c.authority].rightLine, wrongLine: facts[c.authority].wrongLine };
   }
 
@@ -635,31 +779,33 @@
       ${firstCardNotice}
       <div class="source-banner ${c.provenance}" aria-label="Rule source">
         <span class="source-mark" aria-hidden="true">${c.provenance === "participant" ? "YOU" : "F"}</span>
-        <div><small>Who created the instructions</small><strong>${esc(provenanceLabel(c))}</strong></div>
+        <div><small>Who set its limits</small><strong>${esc(provenanceLabel(c))}</strong></div>
       </div>
-      <p style="margin: 1rem 0 0.5rem 0; font-weight: 600;">If you accept this agent, here's how it works:</p>
-      <div class="rule-flow" aria-label="How the agent works">
-        <div class="flow-node"><small>What agent watches for</small><strong>${esc(detail.trigger)}</strong>
+      <p style="margin: 1rem 0 0.5rem 0; font-weight: 600;">If you accept this agent, this is the authority you give it:</p>
+      <div class="rule-flow" aria-label="What the agent may do">
+        <div class="flow-node"><small>When it may act at all</small><strong>${esc(detail.trigger)}</strong>
           <span style="display: block; margin-top: 0.35rem; color: #475569; font-size: 0.8rem;">${esc(detail.frequency)}</span></div>
         <span class="flow-arrow" aria-hidden="true">→</span>
-        <div class="flow-node action"><small>Action</small><strong>${esc(detail.action)}</strong></div>
+        <div class="flow-node action"><small>Then the agent's own call</small><strong>It judges that ${esc(detail.forecast)}</strong></div>
         <span class="flow-arrow" aria-hidden="true">→</span>
-        <div class="flow-node control"><small>Your control</small><strong>${esc(detail.control)}</strong></div>
+        <div class="flow-node control"><small>So it acts</small><strong>${esc(detail.action)}</strong></div>
       </div>
       <div class="scenario">
-        <p style="margin: 0;">The agent acts only on its own forecast. Here its forecast is that
-        <strong>${esc(detail.forecast)}</strong>. Its forecasts are right ${esc(detail.rightRate.toLowerCase())}.</p>
+        <p style="margin: 0 0 0.5rem;"><strong>This is the agent's own call, not a fixed rule.</strong>
+        It decides again every time. It gets the call right ${esc(detail.rightRate.toLowerCase())}.</p>
+        <p style="margin: 0;"><strong>Your control:</strong> ${esc(detail.control)}</p>
       </div>
       <div style="display: grid; gap: 0.5rem; margin: 1rem 0;">
         <div style="background: #ecfdf5; border-left: 3px solid #059669; padding: 0.75rem; border-radius: 4px;">
-          <strong style="display: block; margin-bottom: 0.25rem; color: #065f46;">Forecast right — ${esc(detail.rightRate.toLowerCase())}:</strong>
+          <strong style="display: block; margin-bottom: 0.25rem; color: #065f46;">Its call was right — ${esc(detail.rightRate.toLowerCase())}:</strong>
           <span style="color: #065f46;">${esc(detail.rightStory)}. ${esc(detail.rightLine)}</span>
         </div>
         <div style="background: #fef3e8; border-left: 3px solid #f59e0b; padding: 0.75rem; border-radius: 4px;">
-          <strong style="display: block; margin-bottom: 0.25rem; color: #92400e;">Forecast wrong — ${esc(detail.errorRate.toLowerCase())}:</strong>
+          <strong style="display: block; margin-bottom: 0.25rem; color: #92400e;">Its call was wrong — ${esc(detail.errorRate.toLowerCase())}:</strong>
           <span style="color: #92400e;">${esc(detail.errorStory)}. ${esc(detail.wrongLine)}</span>
         </div>
       </div>
+      <p class="muted compact-copy" style="margin: -0.25rem 0 0; font-size: 0.85rem;">${esc(detail.compareNote)}</p>
       <div id="authorshipStep">
         <button class="primary" id="authorAct">${esc(authorshipActLabel(c))}</button>
       </div>
@@ -689,6 +835,11 @@
         provenance: c.provenance,
         domain: c.domain,
         scenarioShell: shell,
+        // The threshold this card actually showed. Derivable from provenance and the participant's
+        // choice, and stored anyway: it is what the analysis conditions on to separate the bundle
+        // estimate from the attribution-only subgroup, and a stored value can be checked against the
+        // derivation rather than trusted.
+        chosenThreshold: cardThreshold(c),
         adopted,
         // Total time on the card, so it stays comparable with earlier builds, plus the time spent
         // before the authorship act. The difference is the time spent on the choice itself.
@@ -756,13 +907,13 @@
       ${phaseIndicator(3, 4, "Checks")}
       <span class="eyebrow">Quick check</span><h1>Three quick questions</h1>
       <p class="compact-copy">These questions check you understood the key ideas:</p>
-      <fieldset><legend>Imagine you told your account to <strong>sell your shares</strong>, and one of the
-      agents you just read about stepped in and cancelled it. What happened to your shares?</legend>
+      <fieldset><legend>Imagine you told your account to <strong>sell your shares</strong>. One of the
+      agents you just read about cancelled it. What happened to your shares?</legend>
         ${radio("authority", "correct", "They were NOT sold")}
         ${radio("authority", "wrong_initiation", "They were sold for me, without me asking")}
         ${radio("authority", "wrong_none", "They were sold, exactly as I asked")}
       </fieldset>
-      <fieldset><legend>When a card said "You set these instructions"...</legend>
+      <fieldset><legend>When a card said <strong>"You set this&hellip;"</strong>, what did that mean?</legend>
         ${radio("provenance", "correct", "I was described as creating those instructions")}
         ${radio("provenance", "wrong", "Fenrowe was described as creating those instructions")}
       </fieldset>
@@ -855,8 +1006,8 @@
     show(`
       ${phaseIndicator(3, 4, "Checks")}
       <span class="eyebrow">About the rules</span><h1>Whose rules did they feel like?</h1>
-      <p class="compact-copy">Think back over the eight agents. Some cards said you set the instructions;
-      others said Fenrowe set them.</p>
+      <p class="compact-copy">Think back over the eight agents. Some cards said <strong>you</strong> set how
+      much room the agent had. Others said <strong>Fenrowe</strong> set it.</p>
       <fieldset><legend>The agents where <strong>you</strong> set the instructions — how much did those rules
       feel like yours?</legend>
         ${scaleRadios("ownMine", OWNERSHIP_SCALE)}
@@ -908,12 +1059,12 @@
       ${phaseIndicator(3, 4, "Checks")}
       <span class="eyebrow">Almost done</span><h1>A few questions about you</h1>
       <p class="compact-copy">Real life this time, not the pretend accounts. There are no wrong answers.</p>
-      <fieldset><legend>If your own investments dropped 15%, how likely is it that you would sell —
-      and later wish you had not?</legend>
+      <fieldset><legend>Your own investments drop 15%. How likely is it that you sell in a hurry, then
+      wish you had not?</legend>
         ${scaleRadios("antInvesting", LIKELIHOOD_SCALE)}
       </fieldset>
-      <fieldset><legend>If a bill would leave your balance very low, how likely is it that you would pay it
-      anyway — and later wish you had not?</legend>
+      <fieldset><legend>A bill would leave your balance very low. How likely is it that you pay it anyway,
+      then wish you had not?</legend>
         ${scaleRadios("antPayments", LIKELIHOOD_SCALE)}
       </fieldset>
       <fieldset><legend>Your age</legend>
@@ -997,6 +1148,7 @@
       startedAt: state.startedAt,
       completedAt,
       durationMs: Date.now() - state.startedMs,
+      thresholds: state.thresholds,
       attentionPass: state.attentionPass,
       attentionAnswer: state.attentionAnswer,
       checks: state.checks,
@@ -1093,7 +1245,8 @@
       <span class="eyebrow">Complete</span><h1>Thank you</h1>
 
       <p><strong>What this study was about:</strong></p>
-      <p>We're researching how people decide whether to accept AI agents that can either block their actions or act on their behalf, and whether it matters who created the agent's instructions.</p>
+      <p>We are studying how people decide to accept AI agents. Some agents can block what you do.
+      Others act for you. We wanted to see whether it matters who set how much room the agent had.</p>
 
       <p><strong>What was pretend:</strong></p>
       <ul style="margin: 0.5rem 0 1rem 1.5rem;">
@@ -1147,6 +1300,7 @@
     consent: CONSENT,
     consentGaps,
     getState: () => state,
+    THRESHOLDS,
     hash32,
     storyPermutation,
     validateDesign: () => validateDesign(CELLS, SEQUENCES)
@@ -1176,7 +1330,32 @@
     for (let seed = 0; seed < 24; seed++) {
       if (new Set(storyPermutation(seed)).size !== 4) throw new Error(`Story permutation ${seed} is not a permutation`);
     }
-    return { cells: 8, sequences: 16, positionBalanced: true, predecessorBalanced: true, storyPermutations: 24 };
+    // The participant's threshold must reach their own cards in BOTH directions and neither of
+    // Fenrowe's. If it ever became a function of direction, their own choice would sit inside the P1
+    // contrast within a single participant, which is worse than the labelling problem it fixes.
+    for (const domain of ["investing", "payments"]) {
+      const table = THRESHOLDS[domain];
+      for (const option of table.options) {
+        const previous = state.thresholds[domain];
+        state.thresholds[domain] = option;
+        const own = new Set(cells.filter(c => c.domain === domain && c.provenance === "participant")
+                                 .map(c => cardThreshold(c)));
+        const theirs = new Set(cells.filter(c => c.domain === domain && c.provenance === "platform")
+                                    .map(c => cardThreshold(c)));
+        state.thresholds[domain] = previous;
+        if (own.size !== 1 || !own.has(option)) {
+          throw new Error(`${domain}: the participant's threshold does not reach both of their cells`);
+        }
+        if (theirs.size !== 1 || !theirs.has(table.platform)) {
+          throw new Error(`${domain}: the participant's threshold leaked onto a platform cell`);
+        }
+      }
+      if (!table.options.includes(table.platform)) {
+        throw new Error(`${domain}: the platform default is not one of the offered options`);
+      }
+    }
+    return { cells: 8, sequences: 16, positionBalanced: true, predecessorBalanced: true,
+             storyPermutations: 24, thresholdOrthogonalToDirection: true };
   }
 
   validateDesign(CELLS, SEQUENCES);
