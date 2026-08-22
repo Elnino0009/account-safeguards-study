@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.3.0";
-  const INSTRUMENT_VERSION = "study-b-2.3.7";
+  const INSTRUMENT_VERSION = "study-b-2.3.8";
   const ASSIGNMENT_VERSION = "williams-counter-perm-v4";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -248,14 +248,23 @@
       // DOMAIN_FACTS and is deliberately independent of where the trigger sits.
       tokens: value => ({ pct: `${value}%`, floor: `£${100 - value}k` }),
       banner: value => `only after a ${value}% fall`,
-      choice: value => `Only after a ${value}% fall (£100k → £${100 - value}k)`
+      choice: value => `Only after a ${value}% fall (£100k → £${100 - value}k)`,
+      // WHAT THE LEVEL KEEPS BACK. Every stated consequence — how often the agent acts, how often it
+      // is right, what is at stake — is identical at 10%, 15% and 20%, because a consequence that
+      // moved with the choice would confound provenance with expected value. That is correct and it
+      // has a cost: the choice then changes nothing a participant can see, and a choice that changes
+      // nothing generates no ownership, which was the whole reason for having one. What it does
+      // genuinely decide is SCOPE — how much of the account's life is handed over — and scope is
+      // exactly what delegated authority means. Nothing on screen said so until now.
+      scope: value => `Anything smaller than a ${value}% fall stays yours to handle.`
     },
     payments: {
       options: [600, 1200, 1800],
       platform: 1200,
       tokens: value => ({ floor: `£${value.toLocaleString("en-GB")}` }),
       banner: value => `only under £${value.toLocaleString("en-GB")}`,
-      choice: value => `Only under £${value.toLocaleString("en-GB")}`
+      choice: value => `Only under £${value.toLocaleString("en-GB")}`,
+      scope: value => `While the balance stays above £${value.toLocaleString("en-GB")}, bills stay yours to handle.`
     }
   };
 
@@ -710,6 +719,8 @@
       <p class="compact-copy">An AI agent makes its own decisions. You do not set what it decides. You set
       <strong>how much room it has to act</strong>. Below the level you pick, it must leave the account
       alone.</p>
+      <p class="compact-copy">A <strong>lower</strong> level hands the agent more to handle. A
+      <strong>higher</strong> level keeps the smaller cases for you.</p>
       <p class="compact-copy">There are no right answers, and nothing here affects your payment.</p>
       ${item("investing", "Your investment account holds <strong>£100,000</strong>. How far must it fall before an agent may act?")}
       ${item("payments", "Your current account pays monthly bills. How low must the balance get before an agent may act?")}
@@ -768,6 +779,7 @@
              rightStory: arm.rightStory, errorStory: arm.errorStory,
              frequency: facts.frequency, rightRate: facts.rightRate, errorRate: facts.errorRate,
              compareNote: facts.compareNote,
+             scope: THRESHOLDS[c.domain].scope(cardThreshold(c)),
              rightLine: facts[c.authority].rightLine, wrongLine: facts[c.authority].wrongLine };
   }
 
@@ -803,9 +815,10 @@
         <span class="flow-arrow" aria-hidden="true">→</span>
         <div class="flow-node control"><small>So it acts</small><strong>${esc(detail.action)}</strong></div>
       </div>
+      <p class="compact-copy" style="margin: 0.75rem 0 0; font-weight: 600;">${esc(detail.scope)}</p>
       <div class="scenario">
         <p style="margin: 0 0 0.5rem;"><strong>This is the agent's own call, not a fixed rule.</strong>
-        It decides again every time. Fenrowe says its agents get the call right
+        It decides again every time. Fenrowe says <strong>this agent</strong> gets the call right
         ${esc(detail.rightRate.toLowerCase())}.</p>
         <p style="margin: 0;"><strong>Your control:</strong> ${esc(detail.control)}</p>
       </div>
