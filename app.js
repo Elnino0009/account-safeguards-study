@@ -2,7 +2,7 @@
 
 (() => {
   const SCHEMA_VERSION = "ab-empirical-2.3.0";
-  const INSTRUMENT_VERSION = "study-b-2.3.5";
+  const INSTRUMENT_VERSION = "study-b-2.3.6";
   const ASSIGNMENT_VERSION = "williams-counter-perm-v4";
   const DATA_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlL7Q1MTGulPDKc8r3UwYq_i-_7HEUxsOQhIDPSrxn4etn1_TtG2Gcq30NfwU5xtgPgw/exec";
   // Must match completion_codes[0].code in deploy/prolific/study-b.json. The code is chosen by
@@ -429,6 +429,19 @@
   const DOMAIN_FACTS = {
     investing: {
       frequency: "About once a year",
+      // THE RATE IS FENROWE'S CLAIM, NOT AN ORACLE FACT, AND IT IS IDENTICAL ON EVERY CARD.
+      //
+      // Identical is required: a veto and an initiation cannot be compared unless both state the same
+      // error rate, or a participant's private belief about which kind of agent is more competent
+      // rides straight onto P1. That is why the rates went onto the card at all.
+      //
+      // Attributed, because stating a precise accuracy as fact does something beyond holding a
+      // variable constant — it tells the participant there is nothing to choose between the two arms
+      // on competence, and closes the uncertainty that authorship would otherwise fill. Ownership
+      // acts on doubt about how good the agent is; stipulating that doubt away suppresses the very
+      // channel P2 is looking for. Naming Fenrowe as the source keeps the number constant while
+      // leaving it a claim a participant may weigh, and it makes the division the design rests on
+      // explicit: Fenrowe supplies the agent either way, the participant only sets its limits.
       rightRate: "About 4 times in 5",
       errorRate: "About 1 time in 5",
       control: "Remove the agent at any time. That stops it acting again. It does not undo what it already did.",
@@ -792,7 +805,8 @@
       </div>
       <div class="scenario">
         <p style="margin: 0 0 0.5rem;"><strong>This is the agent's own call, not a fixed rule.</strong>
-        It decides again every time. It gets the call right ${esc(detail.rightRate.toLowerCase())}.</p>
+        It decides again every time. Fenrowe says its agents get the call right
+        ${esc(detail.rightRate.toLowerCase())}.</p>
         <p style="margin: 0;"><strong>Your control:</strong> ${esc(detail.control)}</p>
       </div>
       <div style="display: grid; gap: 0.5rem; margin: 1rem 0;">
